@@ -407,9 +407,11 @@ inline void Sqlite::bind_values(sqlite3_stmt* stmt)
 		case SQLITE_FLOAT:
 			verify(sqlite3_bind_double(stmt, id, val.floating_point));
 			break;
-		case SQLITE_TEXT:
-			verify(sqlite3_bind_text(stmt, id, val.text.data(), val.text.size(), SQLITE_TRANSIENT));
+		case SQLITE_TEXT: {
+			const auto& s = val.text;
+			verify(sqlite3_bind_text(stmt, id, s.data(), s.size(), SQLITE_STATIC));
 			break;
+        }
         default:
             throw;
 		}
