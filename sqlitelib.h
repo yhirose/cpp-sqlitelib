@@ -5,6 +5,9 @@
 //  The Boost Software License 1.0
 //
 
+#ifndef _CPPSQLITELIB_HTTPSLIB_H_
+#define _CPPSQLITELIB_HTTPSLIB_H_
+
 #include <sqlite3.h>
 #include <cstdlib>
 #include <cassert>
@@ -64,6 +67,9 @@ public:
 	// Static type version
 	template <typename T>
 	T execute_value(const char* query);
+
+	template <typename T1>
+	std::vector<T1> execute(const char* query);
 
 	template <typename T1, typename T2>
 	std::vector<std::tuple<T1, T2>> execute(const char* query);
@@ -303,6 +309,19 @@ inline T Sqlite::execute_value(const char* query)
     return ret;
 }
 
+template <typename T1>
+inline std::vector<T1> Sqlite::execute(const char* query)
+{
+	std::vector<T1> ret;
+
+	enumrate_rows(query, [&](sqlite3_stmt* stmt) {
+		ret.push_back(get_value<T1>(stmt, 0));
+		return false;
+	});
+
+    return ret;
+}
+
 template <typename T1, typename T2>
 inline std::vector<std::tuple<T1, T2>> Sqlite::execute(const char* query)
 {
@@ -405,5 +424,7 @@ inline void Sqlite::verify(int rc, int expected) const
 }
 
 }
+
+#endif
 
 // vim: et ts=4 sw=4 cin cino={1s ff=unix

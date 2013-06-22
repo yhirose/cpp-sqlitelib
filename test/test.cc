@@ -92,14 +92,15 @@ TEST_F(SqliteTest, ExecuteIntAndText)
 TEST_F(SqliteTest, Bind)
 {
 	{
-		auto sql = "SELECT name FROM people WHERE age=?";
-		auto val = db_.bind(10).execute_value<Text>(sql);
-		EXPECT_EQ("john", val);
+		auto sql = "SELECT name FROM people WHERE age>?";
+		auto rows = db_.bind(10).execute<Text>(sql);
+		EXPECT_EQ(rows.size(), 3);
+		EXPECT_EQ("paul", rows[0]);
 	}
 
 	{
-		auto sql = "SELECT age FROM people WHERE name=?";
-		auto val = db_.bind("john").execute_value<Int>(sql);
+		auto sql = "SELECT age FROM people WHERE name LIKE ?";
+		auto val = db_.bind("jo%").execute_value<Int>(sql);
 		EXPECT_EQ(10, val);
 	}
 
