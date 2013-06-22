@@ -6,8 +6,25 @@
 # Compiled Dynamic libraries
 *.so
 *.dylib
+*.dSYM
 
 # Compiled Static libraries
 *.lai
 *.la
 *.a
+
+# Compiled Executable files
+test/test
+
+
+# Vim
+*.swp
+
+# Visual Studio
+*.sdf
+*.suo
+*.vcxproj.*
+Debug
+Release
+TestResults
+
