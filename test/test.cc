@@ -13,6 +13,26 @@ protected:
     virtual void SetUp()
     {
         EXPECT_EQ(true, db_.is_open());
+
+        db_.prepare(
+            "CREATE TABLE IF NOT EXISTS people ("
+            "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "    name TEXT,"
+            "    age INTEGER,"
+            "    data BLOB"
+            ");"
+            ).execute();
+
+        auto stmt = db_.prepare("INSERT INTO people (name, age, data) VALUES (?, ?, ?);");
+        stmt.execute("john", 10, std::vector<char>({ 'A', 'B', 'C', 'D' }));
+        stmt.execute("paul", 20, std::vector<char>({ 'E', 'B', 'G', 'H' }));
+        stmt.execute("mark", 15, std::vector<char>({ 'I', 'J', 'K', 'L' }));
+        stmt.execute("luke", 25, std::vector<char>({ 'M', 'N', 'O', 'P' }));
+    }
+
+    virtual void TearDown()
+    {
+        db_.prepare("DROP TABLE IF EXISTS people;").execute();
     }
 
     Sqlite db_;
@@ -57,9 +77,19 @@ TEST_F(SqliteTest, Bind)
 {
     {
         auto sql = "SELECT name FROM people WHERE age>?";
-        auto rows = db_.prepare<Text>(sql).execute(10);
-        EXPECT_EQ(rows.size(), 3); 
-        EXPECT_EQ("paul", rows[0]);
+        auto stmt = db_.prepare<Text>(sql);
+
+        {
+            auto rows = stmt.execute(10);
+            EXPECT_EQ(rows.size(), 3); 
+            EXPECT_EQ("paul", rows[0]);
+        }
+
+        {
+            auto rows = stmt.bind(10).execute();
+            EXPECT_EQ(rows.size(), 3); 
+            EXPECT_EQ("paul", rows[0]);
+        }
     }
 
     {
