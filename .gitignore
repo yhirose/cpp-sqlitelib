@@ -13,9 +13,9 @@
 *.la
 *.a
 
-# Compiled Executable files
+# Executable files and resources
 test/test
-
+test/test.db
 
 # Vim
 *.swp
