@@ -15,6 +15,8 @@
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include <tuple>
+#include <type_traits>
 
 namespace sqlitelib {
 
@@ -23,6 +25,108 @@ typedef double Float;
 typedef std::string Text;
 typedef std::vector<char> Blob;
 
+namespace {
+
+inline void verify(int rc, int expected = SQLITE_OK)
+{
+    if (rc != expected) {
+        throw;
+    }
+}
+
+template <typename T>
+T get_column_value(sqlite3_stmt* stmt, int col) {}
+
+template <>
+int get_column_value<int>(sqlite3_stmt* stmt, int col)
+{
+    return sqlite3_column_int(stmt, col);
+}
+
+template <>
+double get_column_value<double>(sqlite3_stmt* stmt, int col)
+{
+    return sqlite3_column_double(stmt, col);
+}
+
+template <>
+std::string get_column_value<std::string>(sqlite3_stmt* stmt, int col)
+{
+    auto val = std::string(sqlite3_column_bytes(stmt, col), 0);
+    memcpy(&val[0], sqlite3_column_text(stmt, col), val.size());
+    return val;
+}
+
+template <>
+std::vector<char> get_column_value<std::vector<char>>(sqlite3_stmt* stmt, int col)
+{
+    auto val = std::vector<char>(sqlite3_column_bytes(stmt, col));
+    memcpy(&val[0], sqlite3_column_blob(stmt, col), val.size());
+    return val;
+}
+
+template <int N, typename T, typename... Rest>
+struct ColumnValues;
+
+template <int N, typename T, typename... Rest>
+struct ColumnValues {
+    static std::tuple<T, Rest...> get(sqlite3_stmt* stmt, int col)
+    {
+        return std::tuple_cat(
+            std::make_tuple(get_column_value<T>(stmt, col)),
+            ColumnValues<N - 1, Rest...>::get(stmt, col + 1));
+    }
+};
+
+template <typename T>
+struct ColumnValues<1, T> {
+    static std::tuple<T> get(sqlite3_stmt* stmt, int col)
+    {
+        return std::make_tuple(get_column_value<T>(stmt, col));
+    }
+};
+
+template <typename T>
+void bind_value(sqlite3_stmt* stmt, int col, T val)	{}
+
+template <>
+void bind_value<int>(sqlite3_stmt* stmt, int col, int val)
+{
+    verify(sqlite3_bind_int(stmt, col, val));
+}
+
+template <>
+void bind_value<double>(sqlite3_stmt* stmt, int col, double val)
+{
+    verify(sqlite3_bind_double(stmt, col, val));
+}
+
+template <>
+void bind_value<std::string>(sqlite3_stmt* stmt, int col, std::string val)
+{
+    verify(sqlite3_bind_text(stmt, col, val.data(), val.size(), SQLITE_TRANSIENT));
+}
+
+template <>
+void bind_value<const char*>(sqlite3_stmt* stmt, int col, const char* val)
+{
+    verify(sqlite3_bind_text(stmt, col, val, strlen(val), SQLITE_TRANSIENT));
+}
+
+inline void bind_values(sqlite3_stmt* stmt, int col)
+{
+}
+
+template <typename T, typename... Rest>
+void bind_values(sqlite3_stmt* stmt, int col, const T& val, const Rest&... rest)
+{
+    bind_value(stmt, col, val);
+    bind_values(stmt, col + 1, rest...);
+}
+
+};
+
+template <typename T, typename... Rest>
 class Statement
 {
 public:
@@ -43,61 +147,39 @@ public:
 	    verify(sqlite3_finalize(stmt));
 	}
 
-	template <typename T1>
-	Statement& bind(T1 val1)
+	template <typename... Args>
+	T execute_value(const Args&... args)
 	{
-		verify(sqlite3_reset(stmt));
-		bind_value(val1, 1);
-		return *this;
-	}
-
-	template <typename T1, typename T2>
-	Statement& bind(T1 val1, T2 val2)
-	{
-		verify(sqlite3_reset(stmt));
-		bind_value(val1, 1);
-		bind_value(val2, 2);
-		return *this;
-	}
-
-	template <typename T>
-	T execute_value()
-	{
+        bind(args...);
 		T ret;
-
 		enumrate_rows([&]() {
-			ret = get_value<T>(0);
+			ret = get_column_value<T>(stmt, 0);
 			return true;
 		});
-
 		return ret;
 	}
 
-	template <typename T1>
-	std::vector<T1> execute()
+	template <typename... Args>
+	std::vector<T> execute_one_column(const Args&... args)
 	{
-		std::vector<T1> ret;
-
+        bind(args...);
+        std::vector<T> ret;
 		enumrate_rows([&]() {
-			ret.push_back(get_value<T1>(0));
+			ret.push_back(get_column_value<T>(stmt, 0));
 			return false;
 		});
-
 		return ret;
 	}
 
-	template <typename T1, typename T2>
-	std::vector<std::tuple<T1, T2>> execute()
+	template <typename... Args>
+	std::vector<std::tuple<T, Rest...>> execute(const Args&... args)
 	{
-		std::vector<std::tuple<T1, T2>> ret;
-
+        bind(args...);
+        std::vector<std::tuple<T, Rest...>> ret;
 		enumrate_rows([&]() {
-			ret.push_back(std::make_tuple(
-				get_value<T1>(0),
-				get_value<T2>(1)));
+			ret.push_back(ColumnValues<1 + sizeof...(Rest), T, Rest...>::get(stmt, 0));
 			return false;
 		});
-
 		return ret;
 	}
 
@@ -107,14 +189,16 @@ private:
 
 	sqlite3_stmt* stmt;
 
-	template <typename T>
-	T get_value(int col) {}
+	template <typename... Args>
+	Statement& bind(const Args&... args)
+	{
+		verify(sqlite3_reset(stmt));
+        bind_values(stmt, 1, args...);
+		return *this;
+	}
 
-	template <typename T>
-	void bind_value(T val, int col)	{}
-
-	template <typename T>
-	void enumrate_rows(T func)
+	template <typename Func>
+	void enumrate_rows(Func func)
 	{
 		int rc;
 		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
@@ -124,13 +208,6 @@ private:
 			}
 		}
 		verify(rc, SQLITE_DONE);
-	}
-
-	void verify(int rc, int expected = SQLITE_OK) const
-	{
-		if (rc != expected) {
-			throw;
-		}
 	}
 };
 
@@ -159,9 +236,10 @@ public:
 		return db_ != nullptr;
 	}
 
-	Statement prepare(const char* query) const
+    template <typename... Types>
+	Statement<Types...> prepare(const char* query) const
 	{
-		return Statement(db_, query);
+		return Statement<Types...>(db_, query);
 	}
 
 private:
@@ -171,58 +249,6 @@ private:
 
     sqlite3* db_;
 };
-
-template <>
-int Statement::get_value<int>(int col)
-{
-    return sqlite3_column_int(stmt, col);
-}
-
-template <>
-double Statement::get_value<double>(int col)
-{
-    return sqlite3_column_double(stmt, col);
-}
-
-template <>
-std::string Statement::get_value<std::string>(int col)
-{
-    auto val = std::string(sqlite3_column_bytes(stmt, col), 0);
-    memcpy(&val[0], sqlite3_column_text(stmt, col), val.size());
-    return val;
-}
-
-template <>
-std::vector<char> Statement::get_value<std::vector<char>>(int col)
-{
-    auto val = std::vector<char>(sqlite3_column_bytes(stmt, col));
-    memcpy(&val[0], sqlite3_column_blob(stmt, col), val.size());
-    return val;
-}
-
-template <>
-void Statement::bind_value<int>(int val, int col)
-{
-    verify(sqlite3_bind_int(stmt, col, val));
-}
-
-template <>
-void Statement::bind_value<double>(double val, int col)
-{
-    verify(sqlite3_bind_double(stmt, col, val));
-}
-
-template <>
-void Statement::bind_value<std::string>(std::string val, int col)
-{
-    verify(sqlite3_bind_text(stmt, col, val.data(), val.size(), SQLITE_TRANSIENT));
-}
-
-template <>
-void Statement::bind_value<const char*>(const char* val, int col)
-{
-    verify(sqlite3_bind_text(stmt, col, val, strlen(val), SQLITE_TRANSIENT));
-}
 
 }
 
