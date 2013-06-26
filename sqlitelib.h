@@ -110,6 +110,12 @@ void bind_value<const char*>(sqlite3_stmt* stmt, int col, const char* val)
     verify(sqlite3_bind_text(stmt, col, val, strlen(val), SQLITE_TRANSIENT));
 }
 
+template <>
+void bind_value<std::vector<char>>(sqlite3_stmt* stmt, int col, std::vector<char> val)
+{
+    verify(sqlite3_bind_blob(stmt, col, val.data(), val.size(), SQLITE_TRANSIENT));
+}
+
 };
 
 template <typename T, typename... Rest>
@@ -131,6 +137,14 @@ public:
     ~Statement()
     {
         verify(sqlite3_finalize(stmt_));
+    }
+
+    template <typename... Args>
+    Statement<T, Rest...>& bind(const Args&... args)
+    {
+        verify(sqlite3_reset(stmt_));
+        bind_values(1, args...);
+        return *this;
     }
 
     template <typename... Args>
@@ -202,13 +216,6 @@ private:
     {
         bind_value(stmt_, col, val);
         bind_values(col + 1, rest...);
-    }
-
-    template <typename... Args>
-    void bind(const Args&... args)
-    {
-        verify(sqlite3_reset(stmt_));
-        bind_values(1, args...);
     }
 
     template <typename Func>
