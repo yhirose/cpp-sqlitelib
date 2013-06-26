@@ -89,7 +89,7 @@ struct ColumnValues<1, T> {
 };
 
 template <typename T>
-void bind_value(sqlite3_stmt* stmt, int col, T val)	{}
+void bind_value(sqlite3_stmt* stmt, int col, T val)    {}
 
 template <>
 void bind_value<int>(sqlite3_stmt* stmt, int col, int val)
@@ -132,123 +132,123 @@ template <typename T, typename... Rest>
 class Statement
 {
 public:
-	Statement(sqlite3* db, const char* query)
-		: stmt(nullptr)
-	{
-		verify(sqlite3_prepare(db, query, strlen(query), &stmt, nullptr));
-	}
+    Statement(sqlite3* db, const char* query)
+        : stmt(nullptr)
+    {
+        verify(sqlite3_prepare(db, query, strlen(query), &stmt, nullptr));
+    }
 
-	Statement(Statement&& rhs)
-		: stmt(rhs.stmt)
-	{
-		rhs.stmt = nullptr;
-	}
+    Statement(Statement&& rhs)
+        : stmt(rhs.stmt)
+    {
+        rhs.stmt = nullptr;
+    }
 
-	~Statement()
-	{
-	    verify(sqlite3_finalize(stmt));
-	}
+    ~Statement()
+    {
+        verify(sqlite3_finalize(stmt));
+    }
 
-	template <typename... Args>
-	T execute_value(const Args&... args)
-	{
+    template <typename... Args>
+    T execute_value(const Args&... args)
+    {
         bind(args...);
-		T ret;
-		enumrate_rows([&]() {
-			ret = get_column_value<T>(stmt, 0);
-			return true;
-		});
-		return ret;
-	}
+        T ret;
+        enumrate_rows([&]() {
+            ret = get_column_value<T>(stmt, 0);
+            return true;
+        });
+        return ret;
+    }
 
-	template <
+    template <
         int RestSize = sizeof...(Rest),
         typename std::enable_if<(RestSize == 0)>::type*& = enabler,
         typename... Args>
-	std::vector<T> execute(const Args&... args)
-	{
+    std::vector<T> execute(const Args&... args)
+    {
         bind(args...);
         std::vector<T> ret;
-		enumrate_rows([&]() {
-			ret.push_back(get_column_value<T>(stmt, 0));
-			return false;
-		});
-		return ret;
-	}
+        enumrate_rows([&]() {
+            ret.push_back(get_column_value<T>(stmt, 0));
+            return false;
+        });
+        return ret;
+    }
 
-	template <
+    template <
         int RestSize = sizeof...(Rest),
         typename std::enable_if<(RestSize != 0)>::type*& = enabler,
         typename... Args>
-	std::vector<std::tuple<T, Rest...>> execute(const Args&... args)
-	{
+    std::vector<std::tuple<T, Rest...>> execute(const Args&... args)
+    {
         bind(args...);
         std::vector<std::tuple<T, Rest...>> ret;
-		enumrate_rows([&]() {
-			ret.push_back(ColumnValues<1 + sizeof...(Rest), T, Rest...>::get(stmt, 0));
-			return false;
-		});
-		return ret;
-	}
+        enumrate_rows([&]() {
+            ret.push_back(ColumnValues<1 + sizeof...(Rest), T, Rest...>::get(stmt, 0));
+            return false;
+        });
+        return ret;
+    }
 
 private:
-	Statement(const Statement& rhs);
-	Statement& operator=(const Statement& rhs);
+    Statement(const Statement& rhs);
+    Statement& operator=(const Statement& rhs);
 
-	sqlite3_stmt* stmt;
+    sqlite3_stmt* stmt;
 
-	template <typename... Args>
-	Statement& bind(const Args&... args)
-	{
-		verify(sqlite3_reset(stmt));
+    template <typename... Args>
+    Statement& bind(const Args&... args)
+    {
+        verify(sqlite3_reset(stmt));
         bind_values(stmt, 1, args...);
-		return *this;
-	}
+        return *this;
+    }
 
-	template <typename Func>
-	void enumrate_rows(Func func)
-	{
-		int rc;
-		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-			if (func()) {
-				rc = SQLITE_DONE;
-				break;
-			}
-		}
-		verify(rc, SQLITE_DONE);
-	}
+    template <typename Func>
+    void enumrate_rows(Func func)
+    {
+        int rc;
+        while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+            if (func()) {
+                rc = SQLITE_DONE;
+                break;
+            }
+        }
+        verify(rc, SQLITE_DONE);
+    }
 };
 
 class Sqlite
 {
 public:
-	Sqlite(const char* path)
-	   : db_(nullptr)
-	{
-		auto rc = sqlite3_open(path, &db_);
-		if (rc) {
-			sqlite3_close(db_);
-			db_ = nullptr;
-		}
-	}
+    Sqlite(const char* path)
+       : db_(nullptr)
+    {
+        auto rc = sqlite3_open(path, &db_);
+        if (rc) {
+            sqlite3_close(db_);
+            db_ = nullptr;
+        }
+    }
 
-	~Sqlite()
-	{
-		if (db_) {
-			sqlite3_close(db_);
-		}
-	}
+    ~Sqlite()
+    {
+        if (db_) {
+            sqlite3_close(db_);
+        }
+    }
 
-	bool is_open() const
-	{
-		return db_ != nullptr;
-	}
+    bool is_open() const
+    {
+        return db_ != nullptr;
+    }
 
     template <typename... Types>
-	Statement<Types...> prepare(const char* query) const
-	{
-		return Statement<Types...>(db_, query);
-	}
+    Statement<Types...> prepare(const char* query) const
+    {
+        return Statement<Types...>(db_, query);
+    }
 
 private:
     Sqlite();
