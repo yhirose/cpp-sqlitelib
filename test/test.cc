@@ -11,82 +11,82 @@ protected:
     SqliteTest() : db_("./test.db") {}
 
     virtual void SetUp()
-	{
-		EXPECT_EQ(true, db_.is_open());
-	}
+    {
+        EXPECT_EQ(true, db_.is_open());
+    }
 
     Sqlite db_;
 };
 
 TEST_F(SqliteTest, ExecuteInt)
 {
-	auto sql = "SELECT age FROM people WHERE name='john'";
-	auto val = db_.prepare<Int>(sql).execute_value();
-	EXPECT_EQ(10, val);
+    auto sql = "SELECT age FROM people WHERE name='john'";
+    auto val = db_.prepare<Int>(sql).execute_value();
+    EXPECT_EQ(10, val);
 }
 
 TEST_F(SqliteTest, ExecuteText)
 {
-	auto sql = "SELECT name FROM people WHERE name='john'";
-	auto val = db_.prepare<Text>(sql).execute_value();
-	EXPECT_EQ("john", val);
+    auto sql = "SELECT name FROM people WHERE name='john'";
+    auto val = db_.prepare<Text>(sql).execute_value();
+    EXPECT_EQ("john", val);
 }
 
 TEST_F(SqliteTest, ExecuteBlob)
 {
-	auto sql = "SELECT data FROM people WHERE name='john'";
-	auto val = db_.prepare<Blob>(sql).execute_value();
-	EXPECT_EQ(4, val.size());
-	EXPECT_EQ('A', val[0]);
-	EXPECT_EQ('D', val[3]);
+    auto sql = "SELECT data FROM people WHERE name='john'";
+    auto val = db_.prepare<Blob>(sql).execute_value();
+    EXPECT_EQ(4, val.size());
+    EXPECT_EQ('A', val[0]);
+    EXPECT_EQ('D', val[3]);
 }
 
 TEST_F(SqliteTest, ExecuteIntAndText)
 {
-	auto sql = "SELECT age, name FROM people";
+    auto sql = "SELECT age, name FROM people";
 
-	auto rows = db_.prepare<Int, Text>(sql).execute();
-	EXPECT_EQ(4, rows.size());
+    auto rows = db_.prepare<Int, Text>(sql).execute();
+    EXPECT_EQ(4, rows.size());
 
-	auto row = rows[3];
-	EXPECT_EQ(25, std::get<0>(row));
-	EXPECT_EQ("luke", std::get<1>(row));
+    auto row = rows[3];
+    EXPECT_EQ(25, std::get<0>(row));
+    EXPECT_EQ("luke", std::get<1>(row));
 }
 
 TEST_F(SqliteTest, Bind)
 {
-	{
-		auto sql = "SELECT name FROM people WHERE age>?";
-		auto rows = db_.prepare<Text>(sql).execute(10);
-		EXPECT_EQ(rows.size(), 3); 
-		EXPECT_EQ("paul", rows[0]);
-	}
+    {
+        auto sql = "SELECT name FROM people WHERE age>?";
+        auto rows = db_.prepare<Text>(sql).execute(10);
+        EXPECT_EQ(rows.size(), 3); 
+        EXPECT_EQ("paul", rows[0]);
+    }
 
-	{
-		auto sql = "SELECT age FROM people WHERE name LIKE ?";
-		auto val = db_.prepare<Int>(sql).execute_value("jo%");
-		EXPECT_EQ(10, val);
-	}
+    {
+        auto sql = "SELECT age FROM people WHERE name LIKE ?";
+        auto val = db_.prepare<Int>(sql).execute_value("jo%");
+        EXPECT_EQ(10, val);
+    }
 
-	{
-		auto sql = "SELECT id FROM people WHERE name=? AND age=?";
-		auto val = db_.prepare<Int>(sql).execute_value("john", 10);
-		EXPECT_EQ(1, val);
-	}
+    {
+        auto sql = "SELECT id FROM people WHERE name=? AND age=?";
+        auto val = db_.prepare<Int>(sql).execute_value("john", 10);
+        EXPECT_EQ(1, val);
+    }
 }
 
 TEST_F(SqliteTest, ReusePreparedStatement)
 {
-	{
-		auto stmt = db_.prepare<Text>("SELECT name FROM people WHERE age>?");
-		auto rows = stmt.execute(10);
-		EXPECT_EQ(rows.size(), 3); 
-		EXPECT_EQ("paul", rows[0]);
+    {
+        auto stmt = db_.prepare<Text>("SELECT name FROM people WHERE age>?");
+        auto rows = stmt.execute(10);
+        EXPECT_EQ(rows.size(), 3); 
+        EXPECT_EQ("paul", rows[0]);
 
-		rows = stmt.execute(20);
-		EXPECT_EQ(rows.size(), 1); 
-		EXPECT_EQ("luke", rows[0]);
-	}
+        rows = stmt.execute(20);
+        EXPECT_EQ(rows.size(), 1); 
+        EXPECT_EQ("luke", rows[0]);
+    }
 }
 
 // vim: et ts=4 sw=4 cin cino={1s ff=unix
