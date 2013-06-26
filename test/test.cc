@@ -89,4 +89,25 @@ TEST_F(SqliteTest, ReusePreparedStatement)
     }
 }
 
+TEST_F(SqliteTest, CreateTable)
+{
+    {
+        db_.prepare("CREATE TABLE IF NOT EXISTS test (key TEXT PRIMARY KEY, value INTEGER);").execute();
+
+        db_.prepare("INSERT INTO test (key, value) VALUES ('zero', 0);").execute();
+        db_.prepare("INSERT INTO test (key, value) VALUES ('one', 1);").execute();
+
+        auto stmt = db_.prepare("INSERT INTO test (key, value) VALUES (?, ?);");
+        stmt.execute("two", 2);
+        stmt.execute("three", 3);
+
+        auto rows = db_.prepare<Text, Int>("SELECT key, value FROM test").execute();
+        EXPECT_EQ(rows.size(), 4); 
+        EXPECT_EQ("one", std::get<0>(rows[1])); 
+        EXPECT_EQ(3, std::get<1>(rows[3])); 
+
+        db_.prepare("DROP TABLE IF EXISTS test;").execute();
+    }
+}
+
 // vim: et ts=4 sw=4 cin cino={1s ff=unix

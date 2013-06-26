@@ -146,6 +146,20 @@ public:
     }
 
     template <
+        typename U = T,
+        typename std::enable_if<std::is_same<U, void>::value>::type*& = enabler,
+        typename... Args>
+    void execute(const Args&... args)
+    {
+        bind(args...);
+        enumrate_rows([&]() {
+            return true;
+        });
+    }
+
+    template <
+        typename U = T,
+        typename std::enable_if<!std::is_same<U, void>::value>::type*& = enabler,
         int RestSize = sizeof...(Rest),
         typename std::enable_if<(RestSize == 0)>::type*& = enabler,
         typename... Args>
@@ -234,6 +248,11 @@ public:
     bool is_open() const
     {
         return db_ != nullptr;
+    }
+
+    Statement<void> prepare(const char* query) const
+    {
+        return Statement<void>(db_, query);
     }
 
     template <typename... Types>
