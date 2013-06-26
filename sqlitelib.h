@@ -9,12 +9,7 @@
 #define _CPPSQLITELIB_HTTPSLIB_H_
 
 #include <sqlite3.h>
-#include <cstdlib>
-#include <cassert>
-#include <functional>
 #include <vector>
-#include <memory>
-#include <unordered_map>
 #include <tuple>
 #include <type_traits>
 
@@ -88,8 +83,8 @@ struct ColumnValues<1, T> {
     }
 };
 
-template <typename T>
-void bind_value(sqlite3_stmt* stmt, int col, T val)    {}
+template <typename Arg>
+void bind_value(sqlite3_stmt* stmt, int col, Arg val) {}
 
 template <>
 void bind_value<int>(sqlite3_stmt* stmt, int col, int val)
@@ -115,17 +110,6 @@ void bind_value<const char*>(sqlite3_stmt* stmt, int col, const char* val)
     verify(sqlite3_bind_text(stmt, col, val, strlen(val), SQLITE_TRANSIENT));
 }
 
-inline void bind_values(sqlite3_stmt* stmt, int col)
-{
-}
-
-template <typename T, typename... Rest>
-void bind_values(sqlite3_stmt* stmt, int col, const T& val, const Rest&... rest)
-{
-    bind_value(stmt, col, val);
-    bind_values(stmt, col + 1, rest...);
-}
-
 };
 
 template <typename T, typename... Rest>
@@ -133,20 +117,20 @@ class Statement
 {
 public:
     Statement(sqlite3* db, const char* query)
-        : stmt(nullptr)
+        : stmt_(nullptr)
     {
-        verify(sqlite3_prepare(db, query, strlen(query), &stmt, nullptr));
+        verify(sqlite3_prepare(db, query, strlen(query), &stmt_, nullptr));
     }
 
     Statement(Statement&& rhs)
-        : stmt(rhs.stmt)
+        : stmt_(rhs.stmt_)
     {
-        rhs.stmt = nullptr;
+        rhs.stmt_ = nullptr;
     }
 
     ~Statement()
     {
-        verify(sqlite3_finalize(stmt));
+        verify(sqlite3_finalize(stmt_));
     }
 
     template <typename... Args>
@@ -155,7 +139,7 @@ public:
         bind(args...);
         T ret;
         enumrate_rows([&]() {
-            ret = get_column_value<T>(stmt, 0);
+            ret = get_column_value<T>(stmt_, 0);
             return true;
         });
         return ret;
@@ -170,7 +154,7 @@ public:
         bind(args...);
         std::vector<T> ret;
         enumrate_rows([&]() {
-            ret.push_back(get_column_value<T>(stmt, 0));
+            ret.push_back(get_column_value<T>(stmt_, 0));
             return false;
         });
         return ret;
@@ -185,7 +169,7 @@ public:
         bind(args...);
         std::vector<std::tuple<T, Rest...>> ret;
         enumrate_rows([&]() {
-            ret.push_back(ColumnValues<1 + sizeof...(Rest), T, Rest...>::get(stmt, 0));
+            ret.push_back(ColumnValues<1 + sizeof...(Rest), T, Rest...>::get(stmt_, 0));
             return false;
         });
         return ret;
@@ -195,21 +179,29 @@ private:
     Statement(const Statement& rhs);
     Statement& operator=(const Statement& rhs);
 
-    sqlite3_stmt* stmt;
+    sqlite3_stmt* stmt_;
+
+    inline void bind_values(int col) {}
+
+    template <typename Arg, typename... ArgRest>
+    void bind_values(int col, const Arg& val, const ArgRest&... rest)
+    {
+        bind_value(stmt_, col, val);
+        bind_values(col + 1, rest...);
+    }
 
     template <typename... Args>
-    Statement& bind(const Args&... args)
+    void bind(const Args&... args)
     {
-        verify(sqlite3_reset(stmt));
-        bind_values(stmt, 1, args...);
-        return *this;
+        verify(sqlite3_reset(stmt_));
+        bind_values(1, args...);
     }
 
     template <typename Func>
     void enumrate_rows(Func func)
     {
         int rc;
-        while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        while ((rc = sqlite3_step(stmt_)) == SQLITE_ROW) {
             if (func()) {
                 rc = SQLITE_DONE;
                 break;
