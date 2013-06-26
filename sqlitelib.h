@@ -27,6 +27,8 @@ typedef std::vector<char> Blob;
 
 namespace {
 
+extern void* enabler;
+
 inline void verify(int rc, int expected = SQLITE_OK)
 {
     if (rc != expected) {
@@ -159,8 +161,11 @@ public:
 		return ret;
 	}
 
-	template <typename... Args>
-	std::vector<T> execute_one_column(const Args&... args)
+	template <
+        int RestSize = sizeof...(Rest),
+        typename std::enable_if<(RestSize == 0)>::type*& = enabler,
+        typename... Args>
+	std::vector<T> execute(const Args&... args)
 	{
         bind(args...);
         std::vector<T> ret;
@@ -171,7 +176,10 @@ public:
 		return ret;
 	}
 
-	template <typename... Args>
+	template <
+        int RestSize = sizeof...(Rest),
+        typename std::enable_if<(RestSize != 0)>::type*& = enabler,
+        typename... Args>
 	std::vector<std::tuple<T, Rest...>> execute(const Args&... args)
 	{
         bind(args...);

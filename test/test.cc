@@ -57,7 +57,7 @@ TEST_F(SqliteTest, Bind)
 {
 	{
 		auto sql = "SELECT name FROM people WHERE age>?";
-		auto rows = db_.prepare<Text>(sql).execute_one_column(10);
+		auto rows = db_.prepare<Text>(sql).execute(10);
 		EXPECT_EQ(rows.size(), 3); 
 		EXPECT_EQ("paul", rows[0]);
 	}
@@ -79,11 +79,11 @@ TEST_F(SqliteTest, ReusePreparedStatement)
 {
 	{
 		auto stmt = db_.prepare<Text>("SELECT name FROM people WHERE age>?");
-		auto rows = stmt.execute_one_column(10);
+		auto rows = stmt.execute(10);
 		EXPECT_EQ(rows.size(), 3); 
 		EXPECT_EQ("paul", rows[0]);
 
-		rows = stmt.execute_one_column(20);
+		rows = stmt.execute(20);
 		EXPECT_EQ(rows.size(), 1); 
 		EXPECT_EQ("luke", rows[0]);
 	}
