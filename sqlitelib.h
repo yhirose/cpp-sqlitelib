@@ -116,6 +116,111 @@ void bind_value<std::vector<char>>(sqlite3_stmt* stmt, int col, std::vector<char
     verify(sqlite3_bind_blob(stmt, col, val.data(), val.size(), SQLITE_TRANSIENT));
 }
 
+template <bool isRestEmpty, typename T, typename... Rest>
+struct ValueType;
+
+template <typename T, typename... Rest>
+struct ValueType<true, T, Rest...> {
+    typedef T type;
+};
+
+template <typename T, typename... Rest>
+struct ValueType<false, T, Rest...> {
+    typedef std::tuple<T, Rest...> type;
+};
+
+};
+
+template <typename T, typename... Rest>
+class Iterator : public std::iterator<
+     std::forward_iterator_tag,
+     typename ValueType<!sizeof...(Rest), T, Rest...>::type>
+{
+public:
+    typedef typename ValueType<!sizeof...(Rest), T, Rest...>::type value_type;
+
+    Iterator()
+        : stmt_(nullptr)
+        , id_(-1)
+    {
+    }
+
+    Iterator(sqlite3_stmt* stmt)
+        : stmt_(stmt)
+        , id_(-1)
+    {
+        operator++();
+    }
+
+    template <
+        int RestSize = sizeof...(Rest),
+        typename std::enable_if<(RestSize == 0)>::type*& = enabler>
+    value_type operator*() const
+    {
+        return get_column_value<T>(stmt_, 0);
+    }
+
+    template <
+        int RestSize = sizeof...(Rest),
+        typename std::enable_if<(RestSize != 0)>::type*& = enabler>
+    value_type operator*() const
+    {
+        return ColumnValues<1 + sizeof...(Rest), T, Rest...>::get(stmt_, 0);
+    }
+
+    Iterator& operator++()
+    {
+        if (stmt_) {
+            auto rc = sqlite3_step(stmt_);
+            if (rc == SQLITE_ROW) {
+                ++id_;
+            } else if (rc == SQLITE_DONE) {
+                id_ = -1;
+            } else {
+                throw; // TODO:
+            }
+        } else {
+            throw; // TODO:
+        }
+        return *this;
+    }
+
+    bool operator==(const Iterator& rhs)
+    {
+        return id_ == rhs.id_;
+    }
+
+    bool operator!=(const Iterator& rhs)
+    {
+        return !operator==(rhs);
+    }
+
+private:
+    sqlite3_stmt* stmt_;
+    int           id_;
+};
+
+template <typename T, typename... Rest>
+class Cursor
+{
+public:
+    Cursor(sqlite3_stmt* stmt)
+        : stmt_(stmt)
+    {
+    }
+
+    Iterator<T, Rest...> begin()
+    {
+        return Iterator<T, Rest...>(stmt_);
+    }
+
+    Iterator<T, Rest...> end()
+    {
+        return Iterator<T, Rest...>();
+    }
+
+private:
+    sqlite3_stmt* stmt_;
 };
 
 template <typename T, typename... Rest>
@@ -147,18 +252,6 @@ public:
         return *this;
     }
 
-    template <typename... Args>
-    T execute_value(const Args&... args)
-    {
-        bind(args...);
-        T ret;
-        enumrate_rows([&]() {
-            ret = get_column_value<T>(stmt_, 0);
-            return true;
-        });
-        return ret;
-    }
-
     template <
         typename U = T,
         typename std::enable_if<std::is_same<U, void>::value>::type*& = enabler,
@@ -166,41 +259,35 @@ public:
     void execute(const Args&... args)
     {
         bind(args...);
-        enumrate_rows([&]() {
-            return true;
-        });
+        verify(sqlite3_step(stmt_), SQLITE_DONE);
     }
 
     template <
         typename U = T,
         typename std::enable_if<!std::is_same<U, void>::value>::type*& = enabler,
-        int RestSize = sizeof...(Rest),
-        typename std::enable_if<(RestSize == 0)>::type*& = enabler,
+        typename V = typename ValueType<!sizeof...(Rest), T, Rest...>::type,
         typename... Args>
-    std::vector<T> execute(const Args&... args)
+    std::vector<V> execute(const Args&... args)
     {
-        bind(args...);
-        std::vector<T> ret;
-        enumrate_rows([&]() {
-            ret.push_back(get_column_value<T>(stmt_, 0));
-            return false;
-        });
+        std::vector<V> ret;
+        for (const auto& x: execute_cursor(args...)) {
+            ret.push_back(x);
+        }
         return ret;
     }
 
-    template <
-        int RestSize = sizeof...(Rest),
-        typename std::enable_if<(RestSize != 0)>::type*& = enabler,
-        typename... Args>
-    std::vector<std::tuple<T, Rest...>> execute(const Args&... args)
+    template <typename... Args>
+    T execute_value(const Args&... args)
+    {
+        auto cursor = execute_cursor(args...);
+        return *cursor.begin();
+    }
+
+    template <typename... Args>
+    Cursor<T, Rest...> execute_cursor(const Args&... args)
     {
         bind(args...);
-        std::vector<std::tuple<T, Rest...>> ret;
-        enumrate_rows([&]() {
-            ret.push_back(ColumnValues<1 + sizeof...(Rest), T, Rest...>::get(stmt_, 0));
-            return false;
-        });
-        return ret;
+        return Cursor<T, Rest...>(stmt_);
     }
 
 private:
@@ -216,19 +303,6 @@ private:
     {
         bind_value(stmt_, col, val);
         bind_values(col + 1, rest...);
-    }
-
-    template <typename Func>
-    void enumrate_rows(Func func)
-    {
-        int rc;
-        while ((rc = sqlite3_step(stmt_)) == SQLITE_ROW) {
-            if (func()) {
-                rc = SQLITE_DONE;
-                break;
-            }
-        }
-        verify(rc, SQLITE_DONE);
     }
 };
 

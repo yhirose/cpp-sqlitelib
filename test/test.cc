@@ -24,10 +24,10 @@ protected:
             ).execute();
 
         auto stmt = db_.prepare("INSERT INTO people (name, age, data) VALUES (?, ?, ?);");
-        stmt.execute("john", 10, std::vector<char>({ 'A', 'B', 'C', 'D' }));
-        stmt.execute("paul", 20, std::vector<char>({ 'E', 'B', 'G', 'H' }));
-        stmt.execute("mark", 15, std::vector<char>({ 'I', 'J', 'K', 'L' }));
-        stmt.execute("luke", 25, std::vector<char>({ 'M', 'N', 'O', 'P' }));
+        stmt.execute("john", 10, vector<char>({ 'A', 'B', 'C', 'D' }));
+        stmt.execute("paul", 20, vector<char>({ 'E', 'B', 'G', 'H' }));
+        stmt.execute("mark", 15, vector<char>({ 'I', 'J', 'K', 'L' }));
+        stmt.execute("luke", 25, vector<char>({ 'M', 'N', 'O', 'P' }));
     }
 
     virtual void TearDown()
@@ -36,6 +36,13 @@ protected:
     }
 
     Sqlite db_;
+
+    std::vector<std::pair<std::string, int>> data_ = {
+        { "john", 10 },
+        { "paul", 20 },
+        { "mark", 15 },
+        { "luke", 25 },
+    };
 };
 
 TEST_F(SqliteTest, ExecuteInt)
@@ -69,8 +76,8 @@ TEST_F(SqliteTest, ExecuteIntAndText)
     EXPECT_EQ(4, rows.size());
 
     auto row = rows[3];
-    EXPECT_EQ(25, std::get<0>(row));
-    EXPECT_EQ("luke", std::get<1>(row));
+    EXPECT_EQ(25, get<0>(row));
+    EXPECT_EQ("luke", get<1>(row));
 }
 
 TEST_F(SqliteTest, Bind)
@@ -133,10 +140,45 @@ TEST_F(SqliteTest, CreateTable)
 
         auto rows = db_.prepare<Text, Int>("SELECT key, value FROM test").execute();
         EXPECT_EQ(rows.size(), 4); 
-        EXPECT_EQ("one", std::get<0>(rows[1])); 
-        EXPECT_EQ(3, std::get<1>(rows[3])); 
+        EXPECT_EQ("one", get<0>(rows[1])); 
+        EXPECT_EQ(3, get<1>(rows[3])); 
 
         db_.prepare("DROP TABLE IF EXISTS test;").execute();
+    }
+}
+
+TEST_F(SqliteTest, Iterator)
+{
+    auto sql = "SELECT name, age FROM people";
+    auto stmt = db_.prepare<Text, Int>(sql);
+
+    auto cursor = stmt.execute_cursor();
+    auto it = cursor.begin();
+    auto itData = data_.begin();
+    while (it != cursor.end()) {
+        EXPECT_EQ(itData->first, get<0>(*it)); 
+        EXPECT_EQ(itData->second, get<1>(*it)); 
+        ++it;
+        ++itData;
+    }
+
+    itData = data_.begin();
+    for (const auto& x: stmt.execute_cursor()) {
+        EXPECT_EQ(itData->first, get<0>(x)); 
+        EXPECT_EQ(itData->second, get<1>(x)); 
+        ++itData;
+    }
+}
+
+TEST_F(SqliteTest, IteratorSingleColumn)
+{
+    auto sql = "SELECT name FROM people";
+    auto stmt = db_.prepare<Text>(sql);
+
+    auto itData = data_.begin();
+    for (const auto& x: stmt.execute_cursor()) {
+        EXPECT_EQ(itData->first, x); 
+        ++itData;
     }
 }
 
