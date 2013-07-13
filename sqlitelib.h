@@ -9,9 +9,10 @@
 #define _CPPSQLITELIB_HTTPSLIB_H_
 
 #include <sqlite3.h>
-#include <vector>
+#include <string>
 #include <tuple>
 #include <type_traits>
+#include <vector>
 
 namespace sqlitelib {
 
@@ -204,6 +205,15 @@ template <typename T, typename... Rest>
 class Cursor
 {
 public:
+    Cursor() = delete;
+    Cursor(const Cursor&) = delete;
+    Cursor& operator=(const Cursor&) = delete;
+
+    Cursor(Cursor&& rhs)
+        : stmt_(rhs.stmt_)
+    {
+    }
+
     Cursor(sqlite3_stmt* stmt)
         : stmt_(stmt)
     {
@@ -309,6 +319,10 @@ private:
 class Sqlite
 {
 public:
+    Sqlite() = delete;
+    Sqlite(const Sqlite&) = delete;
+    Sqlite& operator=(const Sqlite&) = delete;
+
     Sqlite(const char* path)
        : db_(nullptr)
     {
@@ -317,6 +331,11 @@ public:
             sqlite3_close(db_);
             db_ = nullptr;
         }
+    }
+
+    Sqlite(Sqlite&& rhs)
+       : db_(rhs.db_)
+    {
     }
 
     ~Sqlite()
@@ -342,11 +361,36 @@ public:
         return Statement<Types...>(db_, query);
     }
 
-private:
-    Sqlite();
-    Sqlite(const Sqlite&);
-    Sqlite& operator=(const Sqlite&);
+    template <typename... Args>
+    void execute(const char* query, const Args&... args)
+    {
+        prepare<void>(query).execute(args...);
+    }
 
+    template <
+        typename T,
+        typename... Rest,
+        typename std::enable_if<!std::is_same<T, void>::value>::type*& = enabler,
+        typename... Args>
+    std::vector<typename ValueType<!sizeof...(Rest), T, Rest...>::type>
+    execute(const char* query, const Args&... args)
+    {
+        return prepare<T, Rest...>(query).execute(args...);
+    }
+
+    template <typename T, typename... Args>
+    T execute_value(const char* query, const Args&... args)
+    {
+        return prepare<T>(query).execute_value(args...);
+    }
+
+    template <typename T, typename... Rest, typename... Args>
+    Cursor<T, Rest...> execute_cursor(const char* query, const Args&... args)
+    {
+        return prepare<T, Rest...>(query).execute_cursor(args...);
+    }
+
+private:
     sqlite3* db_;
 };
 

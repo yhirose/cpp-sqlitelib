@@ -20,10 +20,10 @@ protected:
             "    name TEXT,"
             "    age INTEGER,"
             "    data BLOB"
-            ");"
+            ")"
             ).execute();
 
-        auto stmt = db_.prepare("INSERT INTO people (name, age, data) VALUES (?, ?, ?);");
+        auto stmt = db_.prepare("INSERT INTO people (name, age, data) VALUES (?, ?, ?)");
         stmt.execute("john", 10, vector<char>({ 'A', 'B', 'C', 'D' }));
         stmt.execute("paul", 20, vector<char>({ 'E', 'B', 'G', 'H' }));
         stmt.execute("mark", 15, vector<char>({ 'I', 'J', 'K', 'L' }));
@@ -32,17 +32,17 @@ protected:
 
     virtual void TearDown()
     {
-        db_.prepare("DROP TABLE IF EXISTS people;").execute();
+        db_.prepare("DROP TABLE IF EXISTS people").execute();
     }
 
     Sqlite db_;
 
-    std::vector<std::pair<std::string, int>> data_ = {
-        { "john", 10 },
-        { "paul", 20 },
-        { "mark", 15 },
-        { "luke", 25 },
-    };
+	std::vector<std::pair<std::string, int>> data_ = {
+		{ "john", 10 },
+		{ "paul", 20 },
+		{ "mark", 15 },
+		{ "luke", 25 },
+	};
 };
 
 TEST_F(SqliteTest, ExecuteInt)
@@ -83,18 +83,18 @@ TEST_F(SqliteTest, ExecuteIntAndText)
 TEST_F(SqliteTest, Bind)
 {
     {
-        auto sql = "SELECT name FROM people WHERE age>?";
+        auto sql = "SELECT name FROM people WHERE age > ?";
         auto stmt = db_.prepare<Text>(sql);
 
         {
             auto rows = stmt.execute(10);
-            EXPECT_EQ(rows.size(), 3); 
+            EXPECT_EQ(3, rows.size()); 
             EXPECT_EQ("paul", rows[0]);
         }
 
         {
             auto rows = stmt.bind(10).execute();
-            EXPECT_EQ(rows.size(), 3); 
+            EXPECT_EQ(3, rows.size()); 
             EXPECT_EQ("paul", rows[0]);
         }
     }
@@ -180,6 +180,28 @@ TEST_F(SqliteTest, IteratorSingleColumn)
         EXPECT_EQ(itData->first, x); 
         ++itData;
     }
+}
+
+TEST_F(SqliteTest, Count)
+{
+    auto sql = "SELECT COUNT(*) FROM people";
+    auto val = db_.prepare<Int>(sql).execute_value();
+    EXPECT_EQ(4, val);
+}
+
+TEST_F(SqliteTest, FlatAPI)
+{
+    auto val = db_.execute_value<Int>("SELECT COUNT(*) FROM people");
+    EXPECT_EQ(4, val);
+
+    auto rows = db_.execute<Text>("SELECT name FROM people WHERE age > ?", 10);
+    EXPECT_EQ(3, rows.size()); 
+    EXPECT_EQ("paul", rows[0]);
+
+    auto rows2 = db_.execute<Int, Text>("SELECT age, name FROM people");
+    EXPECT_EQ(4, rows2.size());
+
+    db_.execute("DROP TABLE IF EXISTS test;");
 }
 
 // vim: et ts=4 sw=4 cin cino={1s ff=unix
