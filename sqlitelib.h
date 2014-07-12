@@ -23,7 +23,7 @@ typedef std::vector<char> Blob;
 
 namespace {
 
-extern void* enabler;
+void* enabler;
 
 inline void verify(int rc, int expected = SQLITE_OK)
 {
