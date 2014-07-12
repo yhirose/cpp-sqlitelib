@@ -1,6 +1,6 @@
 
 CC = clang++
-CCFLAGS = -std=c++0x -stdlib=libc++ -g -DGTEST_USE_OWN_TR1_TUPLE
+CCFLAGS = -std=c++1y -stdlib=libc++ -g -DGTEST_USE_OWN_TR1_TUPLE
 
 all : test
 	./test
