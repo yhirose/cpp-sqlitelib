@@ -16,6 +16,7 @@
 # Executable files and resources
 test/test
 test/test.db
+build/
 
 # Vim
 *.swp
