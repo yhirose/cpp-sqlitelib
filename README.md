@@ -44,9 +44,7 @@ C++11 SQLite wrapper library
     auto rows = db.prepare<int, std::string>(sql).execute();
     rows.size(); // 4
 
-    auto row = rows[3];
-    get<0>(row); // 25
-    get<1>(row); // luke
+    auto [age, name] = rows[3]; // age: 25, name: luke
 
 ## Bind #1
 
