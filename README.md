@@ -89,3 +89,8 @@ C++11 SQLite wrapper library
 
     auto val = db.execute_value<int>("SELECT COUNT(*) FROM people");
     val; // 4
+
+License
+-------
+
+MIT license (© 2020 Yuji Hirose)
