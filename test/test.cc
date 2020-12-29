@@ -123,7 +123,8 @@ TEST_CASE("Sqlite Test", "[general]") {
     stmt.execute("two", 2);
     stmt.execute("three", 3);
 
-    auto rows = db.prepare<string, int>("SELECT key, value FROM test").execute();
+    auto rows =
+        db.prepare<string, int>("SELECT key, value FROM test").execute();
     REQUIRE(rows.size() == 4);
     REQUIRE(get<0>(rows[1]) == "one");
     REQUIRE(get<1>(rows[3]) == 3);
@@ -135,21 +136,23 @@ TEST_CASE("Sqlite Test", "[general]") {
     auto sql = "SELECT name, age FROM people";
     auto stmt = db.prepare<string, int>(sql);
 
-    auto cursor = stmt.execute_cursor();
-    auto it = cursor.begin();
-    auto itData = data.begin();
-    while (it != cursor.end()) {
-      REQUIRE(itData->first == get<0>(*it));
-      REQUIRE(itData->second == get<1>(*it));
-      ++it;
-      ++itData;
+    {
+      auto itData = data.begin();
+      auto cursor = stmt.execute_cursor();
+      for (auto it = cursor.begin(); it != cursor.end(); ++it) {
+        REQUIRE(itData->first == get<0>(*it));
+        REQUIRE(itData->second == get<1>(*it));
+        ++itData;
+      }
     }
 
-    itData = data.begin();
-    for (const auto& x : stmt.execute_cursor()) {
-      REQUIRE(itData->first == get<0>(x));
-      REQUIRE(itData->second == get<1>(x));
-      ++itData;
+    {
+      auto itData = data.begin();
+      for (const auto& [name, age] : stmt.execute_cursor()) {
+        REQUIRE(itData->first == name);
+        REQUIRE(itData->second == age);
+        ++itData;
+      }
     }
   }
 
