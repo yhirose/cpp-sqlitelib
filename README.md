@@ -1,7 +1,7 @@
 cpp-sqlitelib
 =============
 
-C++11 SQLite wrapper library
+A single file C++ header-only SQLite wrapper library
 
 ## Open database
 
