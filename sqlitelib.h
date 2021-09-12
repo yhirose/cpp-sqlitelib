@@ -121,11 +121,13 @@ struct ValueType<false, T, Rest...> {
 };  // namespace
 
 template <typename T, typename... Rest>
-class Iterator : public std::iterator<
-                     std::forward_iterator_tag,
-                     typename ValueType<!sizeof...(Rest), T, Rest...>::type> {
+class Iterator {
  public:
+  typedef std::forward_iterator_tag iterator_category;
   typedef typename ValueType<!sizeof...(Rest), T, Rest...>::type value_type;
+  typedef std::ptrdiff_t difference_type;
+  typedef value_type* pointer;
+  typedef value_type& reference;
 
   Iterator() : stmt_(nullptr), id_(-1) {}
 
