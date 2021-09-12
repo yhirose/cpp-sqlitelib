@@ -88,20 +88,21 @@ void bind_value<double>(sqlite3_stmt* stmt, int col, double val) {
 
 template <>
 void bind_value<std::string>(sqlite3_stmt* stmt, int col, std::string val) {
-  verify(
-      sqlite3_bind_text(stmt, col, val.data(), val.size(), SQLITE_TRANSIENT));
+  verify(sqlite3_bind_text(stmt, col, val.data(), static_cast<int>(val.size()),
+                           SQLITE_TRANSIENT));
 }
 
 template <>
 void bind_value<const char*>(sqlite3_stmt* stmt, int col, const char* val) {
-  verify(sqlite3_bind_text(stmt, col, val, strlen(val), SQLITE_TRANSIENT));
+  verify(sqlite3_bind_text(stmt, col, val, static_cast<int>(strlen(val)),
+                           SQLITE_TRANSIENT));
 }
 
 template <>
 void bind_value<std::vector<char>>(sqlite3_stmt* stmt, int col,
                                    std::vector<char> val) {
-  verify(
-      sqlite3_bind_blob(stmt, col, val.data(), val.size(), SQLITE_TRANSIENT));
+  verify(sqlite3_bind_blob(stmt, col, val.data(), static_cast<int>(val.size()),
+                           SQLITE_TRANSIENT));
 }
 
 template <bool isRestEmpty, typename T, typename... Rest>
@@ -120,11 +121,13 @@ struct ValueType<false, T, Rest...> {
 };  // namespace
 
 template <typename T, typename... Rest>
-class Iterator : public std::iterator<
-                     std::forward_iterator_tag,
-                     typename ValueType<!sizeof...(Rest), T, Rest...>::type> {
+class Iterator {
  public:
+  typedef std::forward_iterator_tag iterator_category;
   typedef typename ValueType<!sizeof...(Rest), T, Rest...>::type value_type;
+  typedef std::ptrdiff_t difference_type;
+  typedef value_type* pointer;
+  typedef value_type& reference;
 
   Iterator() : stmt_(nullptr), id_(-1) {}
 
@@ -190,7 +193,8 @@ template <typename T, typename... Rest>
 class Statement {
  public:
   Statement(sqlite3* db, const char* query) : stmt_(nullptr) {
-    verify(sqlite3_prepare(db, query, strlen(query), &stmt_, nullptr));
+    verify(sqlite3_prepare(db, query, static_cast<int>(strlen(query)), &stmt_,
+                           nullptr));
   }
 
   Statement(Statement&& rhs) : stmt_(rhs.stmt_) { rhs.stmt_ = nullptr; }
