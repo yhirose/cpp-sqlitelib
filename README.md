@@ -7,7 +7,7 @@ A single file C++ header-only SQLite wrapper library
 
     #include <sqlitelib.h>
     using namespace sqlitelib;
-    auto db = Sqlite('./test.db');
+    auto db = Sqlite("./test.db");
 
 ## Create table
 
