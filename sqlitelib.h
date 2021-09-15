@@ -10,6 +10,7 @@
 
 #include <sqlite3.h>
 
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -23,7 +24,7 @@ void* enabler;
 
 inline void verify(int rc, int expected = SQLITE_OK) {
   if (rc != expected) {
-    throw;
+    throw std::exception();
   }
 }
 
@@ -153,10 +154,10 @@ class Iterator {
       } else if (rc == SQLITE_DONE) {
         id_ = -1;
       } else {
-        throw;  // TODO:
+        throw std::exception();  // TODO:
       }
     } else {
-      throw;  // TODO:
+      throw std::exception();  // TODO:
     }
     return *this;
   }

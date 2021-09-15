@@ -219,6 +219,35 @@ TEST_CASE("Sqlite Test", "[general]") {
     }
   }
 
+  SECTION("Exceptions") {
+    SECTION("verify") {
+      db.execute("DROP TABLE IF EXISTS absent");
+      CHECK_THROWS_AS(db.execute("DROP TABLE absent"), std::exception);
+    }
+
+    SECTION("error from sqlite3_step") {
+      db.execute(
+          "CREATE TABLE IF NOT EXISTS non_null (number INTEGER NOT NULL)");
+      auto stmt = db.prepare<int>("INSERT INTO non_null (number) VALUES (?)");
+      auto cursor = stmt.execute_cursor(nullptr);
+
+      // sqlite3_step returns SQLITE_ERROR when attempting to insert "null"
+      CHECK_THROWS_AS(cursor.begin(), std::exception);
+
+      // sqlite3_reset returns SQLITE_CONSTRAINT
+      CHECK_THROWS_AS(stmt.bind(8), std::exception);
+
+      stmt.execute(7);
+
+      db.execute("DROP TABLE IF EXISTS non_null");
+    }
+
+    SECTION("null Iterator::stmt_") {
+      Iterator<int> it;
+      CHECK_THROWS_AS(++it, std::exception);
+    }
+  }
+
   db.prepare("DROP TABLE IF EXISTS people").execute();
 }
 
