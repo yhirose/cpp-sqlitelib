@@ -251,7 +251,6 @@ class Statement {
   }
 
  private:
-  Statement(const Statement& rhs);
   Statement& operator=(const Statement& rhs);
 
   sqlite3_stmt* new_sqlite3_stmt(sqlite3* db, const char* query) {
