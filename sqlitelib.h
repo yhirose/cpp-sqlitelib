@@ -10,6 +10,7 @@
 
 #include <sqlite3.h>
 
+#include <cstring>
 #include <memory>
 #include <stdexcept>
 #include <string>
