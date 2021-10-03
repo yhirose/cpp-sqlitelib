@@ -11,6 +11,7 @@
 #include <sqlite3.h>
 
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -24,7 +25,7 @@ void* enabler;
 
 inline void verify(int rc, int expected = SQLITE_OK) {
   if (rc != expected) {
-    throw;
+    throw std::exception();
   }
 }
 
@@ -154,10 +155,10 @@ class Iterator {
       } else if (rc == SQLITE_DONE) {
         id_ = -1;
       } else {
-        throw;  // TODO:
+        throw std::exception();  // TODO:
       }
     } else {
-      throw;  // TODO:
+      throw std::exception();  // TODO:
     }
     return *this;
   }
@@ -198,12 +199,9 @@ template <typename T, typename... Rest>
 class Statement {
  public:
   Statement(sqlite3* db, const char* query)
-      : stmt_(new_sqlite3_stmt(db, query), sqlite3_stmt_deleter) {
-  }
+      : stmt_(new_sqlite3_stmt(db, query), sqlite3_stmt_deleter) {}
 
-  Statement(Statement&& rhs) : stmt_(rhs.stmt_) {
-    rhs.stmt_ = nullptr;
-  }
+  Statement(Statement&& rhs) : stmt_(rhs.stmt_) { rhs.stmt_ = nullptr; }
 
   Statement() = delete;
   Statement(Statement& rhs) = default;
