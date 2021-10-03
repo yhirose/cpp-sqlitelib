@@ -187,6 +187,38 @@ TEST_CASE("Sqlite Test", "[general]") {
     db.execute("DROP TABLE IF EXISTS test;");
   }
 
+  SECTION("FlatAPI - Iterator") {
+    {
+      auto itData = data.begin();
+      auto cursor =
+          db.execute_cursor<string, int>("SELECT name, age FROM people");
+      for (auto it = cursor.begin(); it != cursor.end(); ++it) {
+        REQUIRE(itData->first == get<0>(*it));
+        REQUIRE(itData->second == get<1>(*it));
+        ++itData;
+      }
+    }
+
+    {
+      auto itData = data.begin();
+      for (const auto& [name, age] :
+           db.execute_cursor<string, int>("SELECT name, age FROM people")) {
+        REQUIRE(itData->first == name);
+        REQUIRE(itData->second == age);
+        ++itData;
+      }
+    }
+  }
+
+  SECTION("FlatAPI - IteratorSingleColumn") {
+    auto rng = db.execute_cursor<string>("SELECT name FROM people");
+    auto itData = data.begin();
+    for (const auto& x : rng) {
+      REQUIRE(itData->first == x);
+      ++itData;
+    }
+  }
+
   db.prepare("DROP TABLE IF EXISTS people").execute();
 }
 

@@ -90,7 +90,18 @@ A single file C++ header-only SQLite wrapper library
     auto val = db.execute_value<int>("SELECT COUNT(*) FROM people");
     val; // 4
 
+## Flat API
+
+    for (const auto& [name, age] :
+         db.execute_cursor<string, int>("SELECT name, age FROM people")) {
+      ;
+    }
+
+    for (const auto& x: db.execute_cursor<std::string>("SELECT name FROM people")) {
+      ;
+    }
+
 License
 -------
 
-MIT license (© 2020 Yuji Hirose)
+MIT license (© 2021 Yuji Hirose)

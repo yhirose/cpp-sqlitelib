@@ -170,6 +170,10 @@ class Iterator {
   int id_;
 };
 
+inline void sqlite3_stmt_deleter(sqlite3_stmt* stmt) {
+  verify(sqlite3_finalize(stmt));
+};
+
 template <typename T, typename... Rest>
 class Cursor {
  public:
@@ -179,31 +183,34 @@ class Cursor {
 
   Cursor(Cursor&& rhs) : stmt_(rhs.stmt_) {}
 
-  Cursor(sqlite3_stmt* stmt) : stmt_(stmt) {}
+  Cursor(std::shared_ptr<sqlite3_stmt> stmt) : stmt_(stmt) {}
 
-  Iterator<T, Rest...> begin() { return Iterator<T, Rest...>(stmt_); }
+  Iterator<T, Rest...> begin() { return Iterator<T, Rest...>(stmt_.get()); }
 
   Iterator<T, Rest...> end() { return Iterator<T, Rest...>(); }
 
  private:
-  sqlite3_stmt* stmt_;
+  std::shared_ptr<sqlite3_stmt> stmt_;
 };
 
 template <typename T, typename... Rest>
 class Statement {
  public:
-  Statement(sqlite3* db, const char* query) : stmt_(nullptr) {
-    verify(sqlite3_prepare(db, query, static_cast<int>(strlen(query)), &stmt_,
-                           nullptr));
+  Statement(sqlite3* db, const char* query)
+      : stmt_(new_sqlite3_stmt(db, query), sqlite3_stmt_deleter) {
   }
 
-  Statement(Statement&& rhs) : stmt_(rhs.stmt_) { rhs.stmt_ = nullptr; }
+  Statement(Statement&& rhs) : stmt_(rhs.stmt_) {
+    rhs.stmt_ = nullptr;
+  }
 
-  ~Statement() { verify(sqlite3_finalize(stmt_)); }
+  Statement() = delete;
+  Statement(Statement& rhs) = default;
+  ~Statement() = default;
 
   template <typename... Args>
   Statement<T, Rest...>& bind(const Args&... args) {
-    verify(sqlite3_reset(stmt_));
+    verify(sqlite3_reset(stmt_.get()));
     bind_values(1, args...);
     return *this;
   }
@@ -214,7 +221,7 @@ class Statement {
       typename... Args>
   void execute(const Args&... args) {
     bind(args...);
-    verify(sqlite3_step(stmt_), SQLITE_DONE);
+    verify(sqlite3_step(stmt_.get()), SQLITE_DONE);
   }
 
   template <
@@ -246,15 +253,22 @@ class Statement {
   Statement(const Statement& rhs);
   Statement& operator=(const Statement& rhs);
 
-  sqlite3_stmt* stmt_;
+  sqlite3_stmt* new_sqlite3_stmt(sqlite3* db, const char* query) {
+    sqlite3_stmt* p = nullptr;
+    verify(sqlite3_prepare(db, query, static_cast<int>(strlen(query)), &p,
+                           nullptr));
+    return p;
+  }
 
-  inline void bind_values(int col) {}
+  void bind_values(int col) {}
 
   template <typename Arg, typename... ArgRest>
   void bind_values(int col, const Arg& val, const ArgRest&... rest) {
-    bind_value(stmt_, col, val);
+    bind_value(stmt_.get(), col, val);
     bind_values(col + 1, rest...);
   }
+
+  std::shared_ptr<sqlite3_stmt> stmt_;
 };
 
 class Sqlite {
