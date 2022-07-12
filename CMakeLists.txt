@@ -7,6 +7,6 @@ if(MSVC)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zc:__cplusplus /utf-8")
 endif()
 
-add_subdirectory(test)
-
-install(FILES sqlitelib.h DESTINATION include)
+add_library(cpp-sqlitelib INTERFACE)
+target_include_directories(cpp-sqlitelib INTERFACE .)
+target_link_libraries(cpp-sqlitelib INTERFACE sqlite3)
