@@ -6,27 +6,87 @@
 using namespace std;
 using namespace sqlitelib;
 
+struct UserInfo {
+  int id;
+  string nickname;
+  string username;
+  string password;
+  string email;
+  string created_at;
+  string updated_at;
+  string avatar;
+  bool enabled;
+
+  DECLARE_SQLITE_FIELDS(UserInfo, id, nickname, username, password,
+    email, created_at, updated_at, avatar, enabled
+  );
+
+};
+
 TEST_CASE("Sqlite Test", "[general]") {
   Sqlite db("./test.db");
   REQUIRE(db.is_open());
 
+  db.dropTable("people");
   db.prepare(R"(
     CREATE TABLE IF NOT EXISTS people (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT,
       age INTEGER,
-      data BLOB
+      data BLOB,
+      enabled INTEGER(1) DEFAULT 0
     )
   )")
       .execute();
+  db.dropTableData("people");
 
-  auto stmt =
-      db.prepare("INSERT INTO people (name, age, data) VALUES (?, ?, ?)");
+  db.dropTable("user");
+  db.create_table("user").if_not_exists()
+    .column<int>("id").primary_key().autoincrement()
+    .column<string>("nickname").size(30)
+    .column<string>("username").size(30)
+    .column<string>("password").size(50)
+    .column<string>("email").size(250)
+    .column<string>("created_at").size(100)
+    .column<string>("updated_at").size(100)
+    .column<unsigned char*>("avatar")
+    .column<bool>("enabled").default_value(false)
+    .execute();
+  db.dropTableData("user");
 
-  stmt.execute("john", 10, vector<char>({'A', 'B', 'C', 'D'}));
-  stmt.execute("paul", 20, vector<char>({'E', 'B', 'G', 'H'}));
-  stmt.execute("mark", 15, vector<char>({'I', 'J', 'K', 'L'}));
-  stmt.execute("luke", 25, vector<char>({'M', 'N', 'O', 'P'}));
+
+  auto user_stmt = db.prepare("INSERT INTO user (nickname, username, password, email, enabled) VALUES (?, ?, ?, ?, ?)");
+
+  user_stmt.execute("system", "administrator", "administrator", "admin@admin.com", true);
+  user_stmt.execute("user", "user", "user", "user@admin.com", false);
+
+  db.prepare("UPDATE user SET enabled=?").execute(true);
+
+  auto val1 = db.prepare<bool>("SELECT enabled FROM user WHERE username=?").execute_value("administrator");
+  REQUIRE(val1 == true);
+  auto users = db.query<UserInfo>("SELECT * FROM user").execute();
+
+  for (int i = 0; i < users.size(); i++) {
+    auto &user = users[i];
+    printf("[%d] User[%s]: %s, Email: %s\n", i, user.nickname.c_str(), user.username.c_str(), user.email.c_str());
+  }
+  fflush(stdout);
+
+
+  SECTION("ExecuteUserBool") {
+    auto sql = "SELECT enabled FROM user WHERE username=?";
+    auto val1 = db.prepare<bool>(sql).execute_value("administrator");
+    auto val2 = db.prepare<bool>(sql).execute_value("user");
+    REQUIRE(val1 == true);
+    REQUIRE(val2 == true);
+  }
+
+  auto stmt = db.prepare("INSERT INTO people (name, age, data, enabled) VALUES (?, ?, ?, ?)");
+
+  stmt.execute("john", 10, vector<char>({'A', 'B', 'C', 'D'}), true);
+  stmt.execute("paul", 20, vector<char>({'E', 'B', 'G', 'H'}), true);
+  stmt.execute("mark", 15, std::string("IJKL"), true);
+  stmt.execute("luke", 25, "MNOP", true);
 
   vector<pair<string, int>> data{
       {"john", 10},
@@ -39,6 +99,12 @@ TEST_CASE("Sqlite Test", "[general]") {
     auto sql = "SELECT age FROM people WHERE name='john'";
     auto val = db.prepare<int>(sql).execute_value();
     REQUIRE(val == 10);
+  }
+
+  SECTION("ExecuteBool") {
+    auto sql = "SELECT enabled FROM people WHERE name='john'";
+    auto val = db.prepare<bool>(sql).execute_value();
+    REQUIRE(val == true);
   }
 
   SECTION("ExecuteText") {
