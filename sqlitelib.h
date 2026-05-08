@@ -24,7 +24,7 @@ namespace detail {
 
 inline void verify(int rc, int expected = SQLITE_OK) {
   if (rc != expected) {
-    throw std::exception();
+    throw std::runtime_error(sqlite3_errstr(rc));
   }
 }
 
@@ -159,10 +159,10 @@ class Iterator {
       } else if (rc == SQLITE_DONE) {
         id_ = -1;
       } else {
-        throw std::exception();  // TODO:
+        throw std::runtime_error(sqlite3_errmsg(sqlite3_db_handle(stmt_)));  // NOTE: Placeholders
       }
     } else {
-      throw std::exception();  // TODO:
+      throw std::logic_error("operator++ called on invalid iterator");  // NOTE: Placeholders
     }
     return *this;
   }

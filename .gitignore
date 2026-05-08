@@ -29,3 +29,4 @@ Debug
 Release
 TestResults
 
+sqlitelib_wrap.cxx
